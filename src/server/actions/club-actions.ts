@@ -3,14 +3,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { prisma } from "@/server/db/prisma";
-import { requireActionUser } from "@/server/auth/session";
-
-const text = (v: FormDataEntryValue | null) => String(v ?? "").trim() || null;
-async function clubId() {
-  const u = await requireActionUser();
-  if (!u.clubId) throw new Error("No club");
-  return u.clubId;
-}
+import { syncAthleteStatus } from "@/server/athletes/status";
+import { kyivDateTimeToUtc } from "@/lib/datetime/kyiv";
+import { formText as text, requireActionClubId as clubId } from "./action-utils";
 
 export async function saveGroup(form: FormData) {
   try {
@@ -52,7 +47,14 @@ export async function saveGroup(form: FormData) {
 export async function deactivateGroup(form: FormData) {
   const cid = await clubId();
   const id = z.string().parse(form.get("id"));
-  await prisma.group.update({ where: { id, clubId: cid }, data: { isActive: false } });
+  const memberships = await prisma.groupMembership.findMany({
+    where: { groupId: id, isActive: true, group: { clubId: cid } },
+    select: { athleteId: true },
+  });
+  await prisma.$transaction(async (tx) => {
+    await tx.group.update({ where: { id, clubId: cid }, data: { isActive: false } });
+    for (const membership of memberships) await syncAthleteStatus(tx, membership.athleteId, cid);
+  });
   revalidatePath("/groups");
   return { ok: true as const };
 }
@@ -90,13 +92,16 @@ export async function saveAthlete(form: FormData) {
     if (data.birthDate && Number.isNaN(data.birthDate.getTime()))
       throw new Error("Некоректна дата народження");
     if (id) {
-      await prisma.athlete.update({ where: { id, clubId: cid }, data });
-      if (group)
-        await prisma.groupMembership.upsert({
-          where: { groupId_athleteId: { groupId: group.id, athleteId: id } },
-          create: { groupId: group.id, athleteId: id },
-          update: { isActive: true, leftAt: null },
-        });
+      await prisma.$transaction(async (tx) => {
+        await tx.athlete.update({ where: { id, clubId: cid }, data });
+        if (group)
+          await tx.groupMembership.upsert({
+            where: { groupId_athleteId: { groupId: group.id, athleteId: id } },
+            create: { groupId: group.id, athleteId: id },
+            update: { isActive: true, leftAt: null },
+          });
+        await syncAthleteStatus(tx, id, cid);
+      });
     } else
       await prisma.athlete.create({
         data: {
@@ -123,19 +128,24 @@ export async function saveAthlete(form: FormData) {
   }
 }
 export async function deactivateAthlete(form: FormData) {
-  const cid = await clubId();
-  const id = z.string().parse(form.get("id"));
-  await prisma.athlete.update({
-    where: { id, clubId: cid },
-    data: {
-      isActive: false,
-      memberships: {
-        updateMany: { where: { isActive: true }, data: { isActive: false, leftAt: new Date() } },
-      },
-    },
-  });
-  revalidatePath("/groups");
-  return { ok: true as const };
+  try {
+    const cid = await clubId();
+    const id = z.string().parse(form.get("id"));
+    await prisma.athlete.findFirstOrThrow({ where: { id, clubId: cid } });
+    await prisma.$transaction(async (tx) => {
+      await tx.groupMembership.updateMany({
+        where: { athleteId: id, isActive: true, group: { clubId: cid } },
+        data: { isActive: false, leftAt: new Date() },
+      });
+      await syncAthleteStatus(tx, id, cid);
+    });
+    revalidatePath("/groups");
+    revalidatePath("/athletes");
+    revalidatePath(`/athletes/${id}`);
+    return { ok: true as const };
+  } catch {
+    return { ok: false as const, error: "Не вдалося деактивувати спортсмена" };
+  }
 }
 
 export async function removeAthleteFromGroup(form: FormData) {
@@ -145,18 +155,13 @@ export async function removeAthleteFromGroup(form: FormData) {
     const groupId = z.string().min(1).parse(form.get("groupId"));
     await prisma.group.findFirstOrThrow({ where: { id: groupId, clubId: cid } });
     await prisma.athlete.findFirstOrThrow({ where: { id: athleteId, clubId: cid } });
-    await prisma.groupMembership.updateMany({
-      where: { groupId, athleteId, isActive: true },
-      data: { isActive: false, leftAt: new Date() },
-    });
-    const remaining = await prisma.groupMembership.count({
-      where: { athleteId, isActive: true, group: { clubId: cid } },
-    });
-    if (!remaining)
-      await prisma.athlete.update({
-        where: { id: athleteId, clubId: cid },
-        data: { isActive: false },
+    await prisma.$transaction(async (tx) => {
+      await tx.groupMembership.updateMany({
+        where: { groupId, athleteId, isActive: true },
+        data: { isActive: false, leftAt: new Date() },
       });
+      await syncAthleteStatus(tx, athleteId, cid);
+    });
     revalidatePath(`/groups/${groupId}`);
     revalidatePath("/athletes");
     return { ok: true as const };
@@ -169,7 +174,10 @@ export async function deleteAthlete(form: FormData) {
   try {
     const cid = await clubId();
     const id = z.string().min(1).parse(form.get("id"));
-    await prisma.athlete.findFirstOrThrow({ where: { id, clubId: cid } });
+    const confirmation = z.string().parse(form.get("confirmation"));
+    const athlete = await prisma.athlete.findFirstOrThrow({ where: { id, clubId: cid } });
+    if (confirmation !== "ВИДАЛИТИ" && confirmation !== athlete.lastName)
+      return { ok: false as const, error: "Введіть прізвище спортсмена або ВИДАЛИТИ" };
     await prisma.$transaction(async (tx) => {
       await tx.attendance.deleteMany({ where: { athleteId: id } });
       await tx.groupMembership.deleteMany({ where: { athleteId: id } });
@@ -191,12 +199,12 @@ export async function activateAthlete(form: FormData) {
     await prisma.athlete.findFirstOrThrow({ where: { id, clubId: cid } });
     await prisma.group.findFirstOrThrow({ where: { id: groupId, clubId: cid, isActive: true } });
     await prisma.$transaction(async (tx) => {
-      await tx.athlete.update({ where: { id, clubId: cid }, data: { isActive: true } });
       await tx.groupMembership.upsert({
         where: { groupId_athleteId: { groupId, athleteId: id } },
         create: { groupId, athleteId: id },
         update: { isActive: true, leftAt: null },
       });
+      await syncAthleteStatus(tx, id, cid);
     });
     revalidatePath("/athletes");
     revalidatePath(`/athletes/${id}`);
@@ -215,7 +223,7 @@ export async function addAthletesToGroup(groupId: string, athleteIds: string[]) 
       return { ok: false as const, error: "Оберіть від 1 до 50 спортсменів" };
     await prisma.group.findFirstOrThrow({ where: { id: groupId, clubId: cid, isActive: true } });
     const athletes = await prisma.athlete.findMany({
-      where: { id: { in: ids }, clubId: cid, isActive: true },
+      where: { id: { in: ids }, clubId: cid },
       select: { id: true },
     });
     if (athletes.length !== ids.length)
@@ -238,6 +246,7 @@ export async function addAthletesToGroup(groupId: string, athleteIds: string[]) 
           });
           restored++;
         } else skipped++;
+        await syncAthleteStatus(tx, athlete.id, cid);
       }
     });
     revalidatePath(`/groups/${groupId}`);
@@ -403,8 +412,9 @@ export async function saveTraining(form: FormData) {
           },
         })
       : null;
-    const startsAt = new Date(`${date}T${start}:00+03:00`);
-    const endsAt = end ? new Date(`${date}T${end}:00+03:00`) : null;
+    const startsAt = kyivDateTimeToUtc(date, start);
+    const endsAt = end ? kyivDateTimeToUtc(date, end) : null;
+    if (endsAt && endsAt <= startsAt) throw new Error("Час завершення має бути після початку");
     const data = {
       groupId,
       startsAt,

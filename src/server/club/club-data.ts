@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/server/db/prisma";
 import { requireUser } from "@/server/auth/session";
 import { parseTrainingQuery } from "@/lib/trainings/training-query";
+import { kyivDayRange, kyivPeriodRange } from "@/lib/datetime/kyiv";
 
 export async function requireClub() {
   const user = await requireUser();
@@ -13,10 +14,7 @@ export async function requireClub() {
 export async function getDashboardData() {
   const { clubId } = await requireClub();
   const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
+  const { start: dayStart, end: dayEnd } = kyivDayRange(now);
   const [club, groups, today] = await Promise.all([
     prisma.club.findUniqueOrThrow({ where: { id: clubId } }),
     prisma.group.findMany({
@@ -132,7 +130,10 @@ export async function getAthlete(id: string) {
   const athlete = await prisma.athlete.findFirst({
     where: { id, clubId },
     include: {
-      memberships: { where: { isActive: true }, include: { group: true } },
+      memberships: {
+        where: { isActive: true, group: { isActive: true } },
+        include: { group: true },
+      },
       attendance: {
         include: { training: { include: { group: true } } },
         orderBy: { training: { startsAt: "desc" } },
@@ -154,23 +155,7 @@ export async function getTrainings(input: Record<string, string | undefined> = {
     : "scheduled";
   const page = Math.max(1, Math.min(500, Number(input.page) || 1));
   const now = new Date();
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  if (period === "today") end.setDate(end.getDate() + 1);
-  if (period === "week") {
-    start.setDate(start.getDate() - ((start.getDay() + 6) % 7));
-    end.setTime(start.getTime());
-    end.setDate(end.getDate() + 7);
-  }
-  if (period === "month") {
-    start.setDate(1);
-    end.setMonth(end.getMonth() + 1, 1);
-  }
-  if (period === "year") {
-    start.setMonth(start.getMonth() - 11, 1);
-    end.setMonth(end.getMonth() + 1, 1);
-  }
+  const { start, end } = kyivPeriodRange(period as "today" | "week" | "month" | "year", now);
   const statusWhere =
     status === "cancelled"
       ? { status: "CANCELLED" as const }
@@ -219,9 +204,14 @@ export async function getAthletes(input: Record<string, string | undefined> = {}
     where: {
       clubId,
       ...(status === "active"
-        ? { isActive: true, memberships: { some: { isActive: true } } }
+        ? { isActive: true, memberships: { some: { isActive: true, group: { isActive: true } } } }
         : status === "inactive"
-          ? { OR: [{ isActive: false }, { memberships: { none: { isActive: true } } }] }
+          ? {
+              OR: [
+                { isActive: false },
+                { memberships: { none: { isActive: true, group: { isActive: true } } } },
+              ],
+            }
           : {}),
       ...(input.group ? { memberships: { some: { groupId: input.group, isActive: true } } } : {}),
       ...(q
@@ -247,7 +237,7 @@ export async function getAthletes(input: Record<string, string | undefined> = {}
       parentPhone: true,
       isActive: true,
       memberships: {
-        where: { isActive: true },
+        where: { isActive: true, group: { isActive: true } },
         select: { group: { select: { id: true, name: true } } },
       },
     },

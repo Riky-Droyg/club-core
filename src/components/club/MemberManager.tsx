@@ -8,6 +8,7 @@ import {
   saveAthlete,
 } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 type Member = {
   id: string;
   firstName: string;
@@ -38,6 +39,7 @@ export default function MemberManager({
   const [mode, setMode] = useState<"select" | "new">("select");
   const [search, setSearch] = useState("");
   const [selected, setSelected] = useState<string[]>([]);
+  const [removing, setRemoving] = useState<{ id: string; name: string } | null>(null);
   const router = useRouter();
   const trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -52,19 +54,15 @@ export default function MemberManager({
       triggerElement?.focus();
     };
   }, [open]);
-  const remove = (id: string, name: string) => {
-    if (
-      !confirm(
-        `Видалити спортсмена «${name}» з активного складу? Історія відвідуваності збережеться.`,
-      )
-    )
-      return;
+  const remove = () => {
+    if (!removing) return;
     start(async () => {
       const form = new FormData();
-      form.set("id", id);
-      form.set("athleteId", id);
+      form.set("athleteId", removing.id);
       form.set("groupId", groupId);
-      await removeAthleteFromGroup(form);
+      const result = await removeAthleteFromGroup(form);
+      if (!result.ok) return setError(result.error);
+      setRemoving(null);
       router.refresh();
     });
   };
@@ -117,7 +115,7 @@ export default function MemberManager({
                 </Link>
                 <button
                   className={s.dangerCompact}
-                  onClick={() => remove(m.id, name)}
+                  onClick={() => setRemoving({ id: m.id, name })}
                   disabled={pending}
                 >
                   Видалити
@@ -204,7 +202,7 @@ export default function MemberManager({
                       >
                         <input
                           type="checkbox"
-                          disabled={a.alreadyMember || !a.isActive}
+                          disabled={a.alreadyMember}
                           checked={selected.includes(a.id)}
                           onChange={() =>
                             setSelected((value) =>
@@ -222,7 +220,7 @@ export default function MemberManager({
                             {a.alreadyMember
                               ? "Уже в групі"
                               : !a.isActive
-                                ? "Неактивний"
+                                ? "Неактивний · буде активовано"
                                 : a.parentPhone}
                           </small>
                         </span>
@@ -304,6 +302,17 @@ export default function MemberManager({
           </div>
         </div>
       )}
+      <ConfirmDialog
+        open={Boolean(removing)}
+        type="warning"
+        title="Видалити спортсмена з групи?"
+        description={`Видалити спортсмена «${removing?.name ?? ""}» з цієї групи? Профіль та історія відвідуваності залишаться в системі.`}
+        confirmLabel="Видалити з групи"
+        pending={pending}
+        error={error}
+        onClose={() => setRemoving(null)}
+        onConfirm={remove}
+      />
     </>
   );
 }

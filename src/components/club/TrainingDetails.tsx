@@ -2,6 +2,8 @@
 import { useState, useTransition } from "react";
 import { deleteTraining, saveTraining } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import { formatKyivDateKey, formatKyivTime } from "@/lib/datetime/kyiv";
 type Training = {
   id: string;
   groupId: string;
@@ -23,12 +25,9 @@ export default function TrainingDetails({
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
-  const startEdit = () => {
-    if (confirm("Увімкнути редагування цього тренування?")) setEditing(true);
-  };
+  const [confirmation, setConfirmation] = useState<"edit" | "delete" | null>(null);
+  const startEdit = () => setConfirmation("edit");
   const remove = () => {
-    if (!confirm("Видалити тренування? Відновити його та записи відвідуваності буде неможливо."))
-      return;
     const form = new FormData();
     form.set("id", training.id);
     start(() => deleteTraining(form));
@@ -73,36 +72,20 @@ export default function TrainingDetails({
             <input
               name="date"
               type="date"
-              defaultValue={starts.toISOString().slice(0, 10)}
+              defaultValue={formatKyivDateKey(starts)}
               disabled={!editing}
             />
-            {!editing && (
-              <input type="hidden" name="date" value={starts.toISOString().slice(0, 10)} />
-            )}
+            {!editing && <input type="hidden" name="date" value={formatKyivDateKey(starts)} />}
           </label>
           <label className={s.field}>
             Початок
             <input
               name="startTime"
               type="time"
-              defaultValue={starts.toLocaleTimeString("uk-UA", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Kyiv",
-              })}
+              defaultValue={formatKyivTime(starts)}
               disabled={!editing}
             />
-            {!editing && (
-              <input
-                type="hidden"
-                name="startTime"
-                value={starts.toLocaleTimeString("uk-UA", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  timeZone: "Europe/Kyiv",
-                })}
-              />
-            )}
+            {!editing && <input type="hidden" name="startTime" value={formatKyivTime(starts)} />}
           </label>
         </div>
         <label className={s.field}>
@@ -110,13 +93,7 @@ export default function TrainingDetails({
           <input
             name="endTime"
             type="time"
-            defaultValue={
-              ends?.toLocaleTimeString("uk-UA", {
-                hour: "2-digit",
-                minute: "2-digit",
-                timeZone: "Europe/Kyiv",
-              }) ?? ""
-            }
+            defaultValue={ends ? formatKyivTime(ends) : ""}
             disabled={!editing}
           />
         </label>
@@ -154,11 +131,33 @@ export default function TrainingDetails({
           <p>Разом із тренуванням буде остаточно видалена його відвідуваність.</p>
         </div>
         <div className={s.rowActions}>
-          <button className={s.danger} onClick={remove} disabled={pending}>
+          <button className={s.danger} onClick={() => setConfirmation("delete")} disabled={pending}>
             Видалити
           </button>
         </div>
       </div>
+      <ConfirmDialog
+        open={confirmation === "edit"}
+        type="info"
+        title="Увімкнути редагування?"
+        description="Після підтвердження дані тренування стануть доступними для змін."
+        confirmLabel="Редагувати"
+        onClose={() => setConfirmation(null)}
+        onConfirm={() => {
+          setConfirmation(null);
+          setEditing(true);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmation === "delete"}
+        type="danger"
+        title="Видалити тренування?"
+        description="Тренування та записи відвідуваності буде остаточно видалено. Цю дію неможливо скасувати."
+        confirmLabel="Видалити назавжди"
+        pending={pending}
+        onClose={() => setConfirmation(null)}
+        onConfirm={remove}
+      />
     </section>
   );
 }
