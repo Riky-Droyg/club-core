@@ -19,8 +19,8 @@ export default async function AthletePage({ params }: { params: Promise<{ id: st
   const current = a.memberships[0]?.group;
   return (
     <div className={s.page}>
-      <Link href={current ? `/groups/${current.id}?tab=members` : "/groups"} className={s.topLink}>
-        {current ? "← До групи" : "← До груп"}
+      <Link href="/athletes" className={s.topLink}>
+        ← До спортсменів
       </Link>
       <div className={s.heading} style={{ marginTop: 18 }}>
         <div>

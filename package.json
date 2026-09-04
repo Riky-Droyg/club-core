@@ -18,6 +18,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "db:studio": "prisma studio",
+    "db:sync-athlete-statuses": "tsx scripts/sync-athlete-statuses.ts",
     "mail:up": "docker compose up -d mailpit",
     "mail:down": "docker compose stop mailpit",
     "load:smoke": "k6 run load/k6-smoke.js",

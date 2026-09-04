@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deactivateGroup, saveGroup } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 type Group = {
   id: string;
@@ -159,6 +160,7 @@ function GroupDialog({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
+  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   useEffect(() => {
     if (!group) return;
     const previous = document.activeElement as HTMLElement | null;
@@ -202,8 +204,7 @@ function GroupDialog({
       onSaved(editing ? "Налаштування групи оновлено" : "Групу створено");
     });
   const deactivate = () => {
-    if (!editing || !confirm(`Деактивувати групу «${group.name}»? Історія тренувань збережеться.`))
-      return;
+    if (!editing) return;
     start(async () => {
       const fd = new FormData();
       fd.set("id", group.id);
@@ -306,7 +307,12 @@ function GroupDialog({
           )}
           <div className={s.modalActions}>
             {editing && group.isActive && (
-              <button type="button" className={s.danger} onClick={deactivate} disabled={pending}>
+              <button
+                type="button"
+                className={s.danger}
+                onClick={() => setConfirmDeactivate(true)}
+                disabled={pending}
+              >
                 Деактивувати
               </button>
             )}
@@ -319,6 +325,16 @@ function GroupDialog({
             </button>
           </div>
         </form>
+        <ConfirmDialog
+          open={confirmDeactivate}
+          type="warning"
+          title="Деактивувати групу?"
+          description={`Деактивувати групу «${editing ? group.name : ""}»? Історія тренувань збережеться, а статуси спортсменів буде перераховано.`}
+          confirmLabel="Деактивувати"
+          pending={pending}
+          onClose={() => setConfirmDeactivate(false)}
+          onConfirm={deactivate}
+        />
       </div>
     </div>
   );

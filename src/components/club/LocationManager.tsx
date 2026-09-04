@@ -11,6 +11,7 @@ import {
 } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
 import Toast from "@/components/ui/Toast";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
 export type ManagedLocation = {
   id: string;
@@ -27,17 +28,13 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
   const [notice, setNotice] = useState("");
   const [changingId, setChangingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<{
+    location: ManagedLocation;
+    action: "activate" | "deactivate" | "delete";
+  } | null>(null);
   const router = useRouter();
 
   const changeStatus = (location: ManagedLocation) => {
-    const accepted = location.isActive
-      ? confirm(
-          `Деактивувати локацію «${location.name}»? Вона використовується у ${location.activeGroups} активних групах і ${location.upcomingTrainings} майбутніх тренуваннях. Зв’язки та історія будуть збережені.`,
-        )
-      : confirm(
-          `Активувати локацію “${location.name}”? Після активації вона знову стане доступною у фільтрах, групах і під час створення тренувань.`,
-        );
-    if (!accepted) return;
     const form = new FormData();
     form.set("id", location.id);
     setChangingId(location.id);
@@ -52,17 +49,12 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
       }
       setNotice(location.isActive ? "Локацію деактивовано" : "Локацію активовано");
       setChangingId(null);
+      setConfirmation(null);
       router.refresh();
     });
   };
 
   const remove = (location: ManagedLocation) => {
-    if (
-      !confirm(
-        `Видалити локацію “${location.name}”?\n\nАктивні групи: ${location.activeGroups}\nМайбутні тренування: ${location.upcomingTrainings}\n\nЛокацію буде видалено остаточно. Цю дію неможливо скасувати.`,
-      )
-    )
-      return;
     const form = new FormData();
     form.set("id", location.id);
     setDeletingId(location.id);
@@ -75,6 +67,7 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
       }
       setNotice("Локацію видалено");
       setDeletingId(null);
+      setConfirmation(null);
       router.refresh();
     });
   };
@@ -125,7 +118,12 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
                 <button
                   className={location.isActive ? s.dangerCompact : s.buttonGhost}
                   disabled={pending || changingId === location.id || deletingId === location.id}
-                  onClick={() => changeStatus(location)}
+                  onClick={() =>
+                    setConfirmation({
+                      location,
+                      action: location.isActive ? "deactivate" : "activate",
+                    })
+                  }
                 >
                   {changingId === location.id
                     ? location.isActive
@@ -138,7 +136,7 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
                 <button
                   className={s.dangerCompact}
                   disabled={pending || deletingId === location.id}
-                  onClick={() => remove(location)}
+                  onClick={() => setConfirmation({ location, action: "delete" })}
                 >
                   {deletingId === location.id ? "Видалення…" : "Видалити"}
                 </button>
@@ -160,6 +158,40 @@ export default function LocationManager({ locations }: { locations: ManagedLocat
           setEditing(null);
           setNotice(message);
           router.refresh();
+        }}
+      />
+      <ConfirmDialog
+        open={Boolean(confirmation)}
+        type={confirmation?.action === "delete" ? "danger" : "warning"}
+        title={
+          confirmation?.action === "delete"
+            ? "Видалити локацію?"
+            : confirmation?.action === "activate"
+              ? "Активувати локацію?"
+              : "Деактивувати локацію?"
+        }
+        description={
+          confirmation?.action === "activate"
+            ? `Активувати локацію “${confirmation.location.name}”? Після активації вона знову стане доступною у фільтрах, групах і під час створення тренувань.`
+            : confirmation?.action === "deactivate"
+              ? `Деактивувати локацію «${confirmation.location.name}»? Вона використовується у ${confirmation.location.activeGroups} активних групах і ${confirmation.location.upcomingTrainings} майбутніх тренуваннях. Зв’язки та історія будуть збережені.`
+              : confirmation
+                ? `Видалити локацію “${confirmation.location.name}”? Активні групи: ${confirmation.location.activeGroups}. Майбутні тренування: ${confirmation.location.upcomingTrainings}. Цю дію неможливо скасувати.`
+                : ""
+        }
+        confirmLabel={
+          confirmation?.action === "delete"
+            ? "Видалити"
+            : confirmation?.action === "activate"
+              ? "Активувати"
+              : "Деактивувати"
+        }
+        pending={pending}
+        onClose={() => setConfirmation(null)}
+        onConfirm={() => {
+          if (!confirmation) return;
+          if (confirmation.action === "delete") remove(confirmation.location);
+          else changeStatus(confirmation.location);
         }}
       />
     </>

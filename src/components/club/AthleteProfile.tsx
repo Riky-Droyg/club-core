@@ -1,8 +1,10 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { deactivateAthlete, saveAthlete } from "@/server/actions/club-actions";
+import { deleteAthlete, saveAthlete } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
+import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import Toast from "@/components/ui/Toast";
 type Athlete = {
   id: string;
   firstName: string;
@@ -24,10 +26,11 @@ export default function AthleteProfile({
   const [editing, setEditing] = useState(false);
   const [pending, start] = useTransition();
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [confirmEdit, setConfirmEdit] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const router = useRouter();
-  const enable = () => {
-    if (confirm("Увімкнути редагування даних спортсмена?")) setEditing(true);
-  };
+  const enable = () => setConfirmEdit(true);
   const submit = (form: FormData) =>
     start(async () => {
       const result = await saveAthlete(form);
@@ -38,19 +41,19 @@ export default function AthleteProfile({
       setEditing(false);
       router.refresh();
     });
-  const deactivate = () => {
-    if (!confirm("Видалити спортсмена з активного складу? Історія відвідуваності збережеться."))
-      return;
+  const remove = () => {
     start(async () => {
       const form = new FormData();
       form.set("id", athlete.id);
-      await deactivateAthlete(form);
-      router.push(`/groups/${athlete.groupId}?tab=members`);
-      router.refresh();
+      form.set("confirmation", "ВИДАЛИТИ");
+      const result = await deleteAthlete(form);
+      if (!result.ok) return setError(result.error);
+      router.push("/athletes?deleted=1");
     });
   };
   return (
     <section className={`${s.card} ${s.athleteInfoCard}`}>
+      {notice && <Toast message={notice} onClose={() => setNotice("")} />}
       <div className={s.sectionTitle}>
         <h2>Особисті дані</h2>
         {!editing && athlete.isActive && (
@@ -132,17 +135,43 @@ export default function AthleteProfile({
           </div>
         )}
       </form>
-      {athlete.isActive && (
-        <div className={s.deactivateZone}>
-          <div>
-            <strong>Видалити спортсмена</strong>
-            <p>Спортсмен зникне з активних груп, але історія залишиться.</p>
-          </div>
-          <button className={s.danger} onClick={deactivate} disabled={pending}>
-            Видалити
-          </button>
+      <div className={s.deactivateZone}>
+        <div>
+          <strong>Остаточне видалення</strong>
+          <p>Профіль і пов’язані дані буде видалено без можливості відновлення.</p>
         </div>
-      )}
+        <button className={s.danger} onClick={() => setConfirmDelete(true)} disabled={pending}>
+          Видалити спортсмена
+        </button>
+      </div>
+      <ConfirmDialog
+        open={confirmEdit}
+        type="info"
+        title="Увімкнути редагування?"
+        description="Після підтвердження поля профілю стануть доступними для змін."
+        confirmLabel="Редагувати"
+        onClose={() => setConfirmEdit(false)}
+        onConfirm={() => {
+          setConfirmEdit(false);
+          setEditing(true);
+        }}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        type="danger"
+        title="Остаточно видалити спортсмена?"
+        description={`Остаточно видалити спортсмена “${athlete.firstName} ${athlete.lastName ?? ""}”? Профіль і пов’язані з ним дані буде видалено із системи. Цю дію неможливо скасувати.`}
+        confirmLabel="Видалити назавжди"
+        pending={pending}
+        error={error}
+        verification={{
+          label: "Для підтвердження введіть ВИДАЛИТИ",
+          expected: "ВИДАЛИТИ",
+          placeholder: "ВИДАЛИТИ",
+        }}
+        onClose={() => setConfirmDelete(false)}
+        onConfirm={remove}
+      />
     </section>
   );
 }

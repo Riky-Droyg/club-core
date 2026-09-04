@@ -1,22 +1,13 @@
 "use client";
-import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { activateAthlete, deleteAthlete, saveAthlete } from "@/server/actions/club-actions";
+import { activateAthlete, deactivateAthlete, saveAthlete } from "@/server/actions/club-actions";
 import s from "@/app/core.module.css";
 import Toast from "@/components/ui/Toast";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
+import AthleteRow, { type AthleteListItem } from "./athletes/AthleteRow";
 
-type Athlete = {
-  id: string;
-  firstName: string;
-  lastName: string | null;
-  birthDate: string | null;
-  parentName: string | null;
-  parentPhone: string | null;
-  isActive: boolean;
-  memberships: { group: { id: string; name: string } }[];
-};
+type Athlete = AthleteListItem;
 export default function AthleteManager({
   athletes,
   groups,
@@ -30,7 +21,7 @@ export default function AthleteManager({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
-  const [deleting, setDeleting] = useState<Athlete | null>(null);
+  const [deactivating, setDeactivating] = useState<Athlete | null>(null);
   const [activating, setActivating] = useState<Athlete | null>(null);
   const [activationGroup, setActivationGroup] = useState("");
   const apply = (key: string, value: string) => {
@@ -62,15 +53,15 @@ export default function AthleteManager({
       }
     });
   };
-  const remove = () => {
-    if (!deleting) return;
+  const deactivate = () => {
+    if (!deactivating) return;
     const form = new FormData();
-    form.set("id", deleting.id);
+    form.set("id", deactivating.id);
     start(async () => {
-      const result = await deleteAthlete(form);
+      const result = await deactivateAthlete(form);
       if (!result.ok) return setMessage(result.error);
-      setMessage("Спортсмена повністю видалено");
-      setDeleting(null);
+      setMessage("Спортсмена деактивовано");
+      setDeactivating(null);
       router.refresh();
     });
   };
@@ -126,39 +117,14 @@ export default function AthleteManager({
       </div>
       {message && <Toast message={message} onClose={() => setMessage("")} />}
       <div className={s.memberList}>
-        {athletes.map((a) => {
-          const active = a.isActive && a.memberships.length > 0;
-          return (
-            <article className={s.member} key={a.id}>
-              <span className={s.initial}>
-                {a.firstName[0]}
-                {a.lastName?.[0]}
-              </span>
-              <div>
-                <strong>
-                  {a.firstName} {a.lastName}
-                </strong>
-                <small>
-                  {a.memberships.map((m) => m.group.name).join(" · ") || "Без активної групи"} ·{" "}
-                  {active ? "Активний" : "Неактивний"}
-                </small>
-              </div>
-              <div className={`${s.right} ${s.rowActions}`}>
-                <Link className={s.buttonGhost} href={`/athletes/${a.id}`}>
-                  Огляд
-                </Link>
-                {!active && (
-                  <button className={s.buttonGhost} onClick={() => setActivating(a)}>
-                    Активувати
-                  </button>
-                )}
-                <button className={s.dangerCompact} onClick={() => setDeleting(a)}>
-                  Видалити
-                </button>
-              </div>
-            </article>
-          );
-        })}
+        {athletes.map((athlete) => (
+          <AthleteRow
+            key={athlete.id}
+            athlete={athlete}
+            onActivate={() => setActivating(athlete)}
+            onDeactivate={() => setDeactivating(athlete)}
+          />
+        ))}
       </div>
       {open && (
         <div
@@ -236,14 +202,14 @@ export default function AthleteManager({
         </div>
       )}
       <ConfirmDialog
-        open={Boolean(deleting)}
-        type="danger"
-        title="Повністю видалити спортсмена?"
-        description={`Профіль ${deleting?.firstName ?? ""} ${deleting?.lastName ?? ""}, членства та історію відвідуваності буде остаточно видалено із системи.`}
-        confirmLabel="Видалити назавжди"
+        open={Boolean(deactivating)}
+        type="warning"
+        title="Деактивувати спортсмена?"
+        description={`Деактивувати спортсмена “${deactivating?.firstName ?? ""} ${deactivating?.lastName ?? ""}”? Спортсмен буде видалений з усіх активних груп, але його профіль та історія тренувань залишаться в системі.`}
+        confirmLabel="Деактивувати"
         pending={pending}
-        onClose={() => setDeleting(null)}
-        onConfirm={remove}
+        onClose={() => setDeactivating(null)}
+        onConfirm={deactivate}
       />
       {activating && (
         <div
