@@ -1,0 +1,101 @@
+.page {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: #f6f8fc;
+}
+
+.card {
+  width: min(100%, 440px);
+  padding: 32px;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 18px 50px rgb(15 23 42 / 8%);
+}
+
+.brand {
+  color: #6366f1;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.card h1 {
+  margin: 12px 0 8px;
+  color: #172033;
+}
+.intro {
+  margin: 0 0 24px;
+  color: #64748b;
+}
+.form {
+  display: grid;
+  gap: 16px;
+}
+.form label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-weight: 700;
+}
+.form input {
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1px solid #dbe3ef;
+  border-radius: 12px;
+  font: inherit;
+}
+.form input:focus {
+  outline: 3px solid rgb(99 102 241 / 14%);
+  border-color: #6366f1;
+}
+.submit {
+  min-height: 48px;
+  border: 0;
+  border-radius: 12px;
+  background: #6366f1;
+  color: #fff;
+  font-weight: 800;
+  cursor: pointer;
+}
+.submit:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+.secondaryAction {
+  min-height: 42px;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #4338ca;
+  font-weight: 700;
+  cursor: pointer;
+}
+.error {
+  margin: 0;
+  color: #c2410c;
+  font-size: 14px;
+}
+.success {
+  margin: 0;
+  color: #15803d;
+  font-size: 14px;
+}
+.forgotLink {
+  margin-top: -8px;
+  color: #4f46e5;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+.switch {
+  margin: 20px 0 0;
+  color: #64748b;
+  text-align: center;
+}
+.switch a {
+  color: #4f46e5;
+  font-weight: 700;
+}

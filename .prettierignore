@@ -1,0 +1,6 @@
+.next
+node_modules
+public/icons/sprite.svg
+coverage
+playwright-report
+test-results

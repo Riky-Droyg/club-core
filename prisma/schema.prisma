@@ -1,0 +1,221 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ClubRole {
+  OWNER
+  COACH
+  ADMIN
+  PARENT
+  ATHLETE
+}
+
+enum TrainingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  UNMARKED
+  PRESENT
+  ABSENT
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  clubId        String?
+  clubRole      ClubRole  @default(OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  club          Club?     @relation(fields: [clubId], references: [id], onDelete: SetNull)
+  sessions      Session[]
+  accounts      Account[]
+
+  @@index([clubId])
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model Account {
+  id                    String    @id @default(cuid())
+  userId                String
+  accountId             String
+  providerId            String
+  accessToken           String?
+  refreshToken          String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  idToken               String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@index([userId])
+}
+
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([identifier])
+}
+
+model RateLimit {
+  id          String @id @default(cuid())
+  key         String @unique
+  count       Int
+  lastRequest BigInt
+}
+
+model Club {
+  id        String     @id @default(cuid())
+  name      String
+  logoUrl   String?
+  timezone  String     @default("Europe/Kyiv")
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  users     User[]
+  groups    Group[]
+  athletes  Athlete[]
+  trainings Training[]
+  locations Location[]
+}
+
+model Location {
+  id        String     @id @default(cuid())
+  clubId    String
+  name      String
+  address   String?
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  club      Club       @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  groups    Group[]
+  trainings Training[]
+
+  @@unique([clubId, name])
+  @@index([clubId, isActive])
+}
+
+model Group {
+  id          String            @id @default(cuid())
+  clubId      String
+  name        String
+  description String?
+  ageFrom     Int?
+  ageTo       Int?
+  isActive    Boolean           @default(true)
+  locationId  String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  club        Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  memberships GroupMembership[]
+  trainings   Training[]
+  location    Location?         @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([clubId, isActive])
+  @@index([locationId])
+}
+
+model Athlete {
+  id          String            @id @default(cuid())
+  clubId      String
+  firstName   String
+  lastName    String?
+  birthDate   DateTime?
+  phone       String?
+  parentName  String?
+  parentPhone String?
+  note        String?
+  isActive    Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  club        Club              @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  memberships GroupMembership[]
+  attendance  Attendance[]
+
+  @@index([clubId, isActive])
+  @@index([clubId, lastName, firstName])
+}
+
+model GroupMembership {
+  id        String    @id @default(cuid())
+  groupId   String
+  athleteId String
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+  isActive  Boolean   @default(true)
+  group     Group     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  athlete   Athlete   @relation(fields: [athleteId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, athleteId])
+  @@index([athleteId, isActive])
+}
+
+model Training {
+  id         String         @id @default(cuid())
+  clubId     String
+  groupId    String
+  title      String?
+  startsAt   DateTime
+  endsAt     DateTime?
+  location   String?
+  locationId String?
+  note       String?
+  status     TrainingStatus @default(SCHEDULED)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  club       Club           @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  group      Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
+  venue      Location?      @relation(fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@index([clubId, startsAt])
+  @@index([groupId, startsAt])
+  @@index([locationId])
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  trainingId String
+  athleteId  String
+  status     AttendanceStatus @default(UNMARKED)
+  note       String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  training   Training         @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+  athlete    Athlete          @relation(fields: [athleteId], references: [id], onDelete: Restrict)
+
+  @@unique([trainingId, athleteId])
+  @@index([athleteId, updatedAt])
+}

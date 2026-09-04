@@ -1,0 +1,169 @@
+.shell {
+  min-height: 100vh;
+}
+.sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: 248px;
+  padding: 28px 20px;
+  background: #0c0c0c;
+  border-right: 1px solid #202020;
+  display: flex;
+  flex-direction: column;
+  z-index: 20;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #fff;
+  font-size: 18px;
+  letter-spacing: -0.02em;
+}
+.mark {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: #ff6200;
+  color: #080808;
+  font-weight: 900;
+}
+.club {
+  margin: 36px 10px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.club span {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  color: #666;
+}
+.club strong {
+  font-size: 13px;
+}
+.sidebar nav {
+  display: grid;
+  gap: 5px;
+}
+.sidebar nav a {
+  min-height: 48px;
+  padding: 0 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-radius: 11px;
+  color: #8c8c8c;
+  font-size: 14px;
+}
+.sidebar nav a:hover,
+.sidebar nav a.active {
+  background: #181818;
+  color: #fff;
+}
+.sidebar nav a.active i {
+  color: #ff6200;
+}
+.sidebar i,
+.bottom i {
+  font-style: normal;
+  font-size: 20px;
+}
+.profile {
+  margin-top: auto;
+  padding: 16px 8px 0;
+  border-top: 1px solid #202020;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.profile > span,
+.avatar {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #282828;
+  color: #fff;
+  font-size: 12px;
+}
+.profile div {
+  display: grid;
+  gap: 3px;
+}
+.profile strong {
+  font-size: 12px;
+}
+.profile small {
+  font-size: 10px;
+  color: #777;
+}
+.main {
+  padding-left: 248px;
+  min-height: 100vh;
+}
+.mobileHeader,
+.bottom {
+  display: none;
+}
+@media (max-width: 800px) {
+  .sidebar {
+    display: none;
+  }
+  .main {
+    padding: 64px 0 78px;
+  }
+  .mobileHeader {
+    position: fixed;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    inset: 0 0 auto;
+    height: 64px;
+    padding: 0 18px;
+    background: rgba(8, 8, 8, 0.94);
+    backdrop-filter: blur(12px);
+    border-bottom: 1px solid #1d1d1d;
+    z-index: 20;
+  }
+  .mobileHeader .brand {
+    font-size: 16px;
+  }
+  .mobileHeader .mark {
+    width: 30px;
+    height: 30px;
+  }
+  .avatar {
+    width: 34px;
+    height: 34px;
+  }
+  .bottom {
+    position: fixed;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    inset: auto 0 0;
+    height: 72px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: rgba(12, 12, 12, 0.97);
+    border-top: 1px solid #222;
+    z-index: 30;
+  }
+  .bottom a {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    color: #777;
+    font-size: 10px;
+  }
+  .bottom a.active {
+    color: #ff6200;
+  }
+  .bottom i {
+    font-size: 19px;
+  }
+}

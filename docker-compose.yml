@@ -1,0 +1,23 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: clubcore-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: clubcore
+      POSTGRES_PASSWORD: clubcore
+      POSTGRES_DB: clubcore
+    ports:
+      - "5432:5432"
+    volumes:
+      - clubcore-postgres:/var/lib/postgresql/data
+  mailpit:
+    image: axllent/mailpit:v1.27
+    container_name: clubcore-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  clubcore-postgres:

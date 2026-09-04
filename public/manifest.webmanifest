@@ -1,0 +1,10 @@
+{
+  "name": "CLUB Core",
+  "short_name": "CLUB Core",
+  "description": "Операційний інструмент спортивного клубу",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#080808",
+  "theme_color": "#080808",
+  "lang": "uk"
+}

@@ -1,0 +1,15 @@
+.layoutWrapper {
+  min-height: 100vh;
+  padding-left: 240px;
+}
+
+.pageColumn {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .layoutWrapper {
+    padding-left: 0;
+    padding-top: 64px;
+  }
+}
